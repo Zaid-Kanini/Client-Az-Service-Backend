@@ -1,23 +1,13 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const User = require('../models/User');
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const generateOTP = () => {
   return crypto.randomInt(100000, 999999).toString();
 };
-
-// SMTP transporter with connection pooling
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  pool: true,
-  maxConnections: 5,
-  maxMessages: 100,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
 
 // POST /api/auth/send-otp
 const sendOtp = async (req, res) => {
@@ -50,15 +40,15 @@ const sendOtp = async (req, res) => {
 
     console.log(`OTP for ${normalizedEmail}: ${otp}`);
 
-    // Respond immediately
+    // respond immediately
     res.json({
       message: 'OTP sent to your email',
       otp_dev: otp, // remove in production
     });
 
-    // Send email asynchronously (DO NOT await)
-    transporter.sendMail({
-      from: `"AZ Cake Service" <${process.env.EMAIL_USER}>`,
+    // send email asynchronously
+    resend.emails.send({
+      from: 'AZ Cake Service <onboarding@resend.dev>',
       to: normalizedEmail,
       subject: 'Your OTP Code - AZ Cake Service',
       html: `
@@ -117,7 +107,6 @@ const verifyOtp = async (req, res) => {
       return res.status(400).json({ message: 'Invalid OTP' });
     }
 
-    // Clear OTP
     user.otp = undefined;
     user.otpExpiry = undefined;
     await user.save();
@@ -156,9 +145,7 @@ const updateProfile = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    if (name) {
-      user.name = name.trim();
-    }
+    if (name) user.name = name.trim();
 
     await user.save();
 
@@ -180,7 +167,6 @@ const updateProfile = async (req, res) => {
 // GET /api/auth/me
 const getMe = async (req, res) => {
   try {
-
     const user = await User.findById(req.user.userId)
       .select('-otp -otpExpiry');
 
