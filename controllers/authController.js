@@ -7,9 +7,12 @@ const generateOTP = () => {
   return crypto.randomInt(100000, 999999).toString();
 };
 
-// Configure email transporter
+// SMTP transporter with connection pooling
 const transporter = nodemailer.createTransport({
   service: 'gmail',
+  pool: true,
+  maxConnections: 5,
+  maxMessages: 100,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
@@ -25,10 +28,13 @@ const sendOtp = async (req, res) => {
       return res.status(400).json({ message: 'Email is required' });
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
     const otp = generateOTP();
-    const otpExpiry = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+    const otpExpiry = new Date(Date.now() + 5 * 60 * 1000);
 
-    let user = await User.findOne({ email: email.trim().toLowerCase() });
+    console.log("Generating OTP for:", normalizedEmail);
+
+    let user = await User.findOne({ email: normalizedEmail });
 
     if (user) {
       user.otp = otp;
@@ -36,41 +42,47 @@ const sendOtp = async (req, res) => {
       await user.save();
     } else {
       user = await User.create({
-        email: email.trim().toLowerCase(),
+        email: normalizedEmail,
         otp,
         otpExpiry,
       });
     }
 
-    // Send OTP via email
-    try {
-      await transporter.sendMail({
-        from: `"AZ Cake Service" <${process.env.EMAIL_USER}>`,
-        to: email.trim(),
-        subject: 'Your OTP Code - AZ Cake Service',
-        html: `<div style="font-family:Arial,sans-serif;text-align:center;padding:20px;">
-          <h2 style="color:#0D1B4C;">AZ Cake Service</h2>
-          <p>Your OTP code is:</p>
-          <h1 style="color:#F5941E;letter-spacing:8px;">${otp}</h1>
-          <p>This code expires in 5 minutes.</p>
-        </div>`,
-      });
-    } catch (emailErr) {
-      console.log('Email send failed, OTP logged to console:', otp);
-    }
+    console.log(`OTP for ${normalizedEmail}: ${otp}`);
 
-    // Also log to console for development
-    console.log(`OTP for ${email}: ${otp}`);
-
+    // Respond immediately
     res.json({
       message: 'OTP sent to your email',
-      // Remove this in production — only for development/testing
-      otp_dev: otp,
+      otp_dev: otp, // remove in production
     });
+
+    // Send email asynchronously (DO NOT await)
+    transporter.sendMail({
+      from: `"AZ Cake Service" <${process.env.EMAIL_USER}>`,
+      to: normalizedEmail,
+      subject: 'Your OTP Code - AZ Cake Service',
+      html: `
+      <div style="font-family:Arial,sans-serif;text-align:center;padding:20px;">
+        <h2 style="color:#0D1B4C;">AZ Cake Service</h2>
+        <p>Your OTP code is:</p>
+        <h1 style="color:#F5941E;letter-spacing:8px;">${otp}</h1>
+        <p>This code expires in 5 minutes.</p>
+      </div>
+      `
+    })
+    .then(() => {
+      console.log("OTP email sent successfully");
+    })
+    .catch((err) => {
+      console.error("Email sending failed:", err.message);
+    });
+
   } catch (error) {
+    console.error("Send OTP error:", error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
 
 // POST /api/auth/verify-otp
 const verifyOtp = async (req, res) => {
@@ -81,7 +93,9 @@ const verifyOtp = async (req, res) => {
       return res.status(400).json({ message: 'Email and OTP are required' });
     }
 
-    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
       return res.status(404).json({ message: 'User not found. Please request OTP first.' });
@@ -95,6 +109,7 @@ const verifyOtp = async (req, res) => {
       user.otp = undefined;
       user.otpExpiry = undefined;
       await user.save();
+
       return res.status(400).json({ message: 'OTP has expired. Please request a new one.' });
     }
 
@@ -102,12 +117,11 @@ const verifyOtp = async (req, res) => {
       return res.status(400).json({ message: 'Invalid OTP' });
     }
 
-    // OTP verified — clear it
+    // Clear OTP
     user.otp = undefined;
     user.otpExpiry = undefined;
     await user.save();
 
-    // Generate JWT token
     const token = jwt.sign(
       { userId: user._id, email: user.email },
       process.env.JWT_SECRET,
@@ -123,22 +137,29 @@ const verifyOtp = async (req, res) => {
         name: user.name,
       },
     });
+
   } catch (error) {
+    console.error("Verify OTP error:", error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
 
 // PUT /api/auth/profile
 const updateProfile = async (req, res) => {
   try {
     const { name } = req.body;
+
     const user = await User.findById(req.user.userId);
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    if (name) user.name = name.trim();
+    if (name) {
+      user.name = name.trim();
+    }
+
     await user.save();
 
     res.json({
@@ -148,22 +169,37 @@ const updateProfile = async (req, res) => {
         name: user.name,
       },
     });
+
   } catch (error) {
+    console.error("Update profile error:", error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
 
 // GET /api/auth/me
 const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId).select('-otp -otpExpiry');
+
+    const user = await User.findById(req.user.userId)
+      .select('-otp -otpExpiry');
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
+
     res.json({ user });
+
   } catch (error) {
+    console.error("GetMe error:", error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
-module.exports = { sendOtp, verifyOtp, updateProfile, getMe };
+
+module.exports = {
+  sendOtp,
+  verifyOtp,
+  updateProfile,
+  getMe
+};
