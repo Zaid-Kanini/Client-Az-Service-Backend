@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { body, param } = require('express-validator');
 const { validate } = require('../middleware/validate');
+const { auth, admin } = require('../middleware/auth');
 const { upload } = require('../config/cloudinary');
 const {
   getAllCakes,
@@ -98,6 +99,8 @@ router.get(
  */
 router.post(
   '/',
+  auth,
+  admin,
   upload.single('image'),
   [
     body('name').trim().notEmpty().withMessage('Name is required'),
@@ -146,6 +149,8 @@ router.post(
  */
 router.put(
   '/:id',
+  auth,
+  admin,
   upload.single('image'),
   [param('id').isMongoId().withMessage('Invalid cake ID')],
   validate,
@@ -172,6 +177,8 @@ router.put(
  */
 router.delete(
   '/:id',
+  auth,
+  admin,
   [param('id').isMongoId().withMessage('Invalid cake ID')],
   validate,
   deleteCake

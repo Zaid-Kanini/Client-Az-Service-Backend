@@ -27,35 +27,6 @@ app.get('/', (req, res) => {
   res.json({ message: 'Cake Order Platform API' });
 });
 
-// const nodemailer = require("nodemailer");
-
-// const transporter = nodemailer.createTransport({
-//   service: "gmail",
-//   auth: {
-//     user: process.env.EMAIL_USER,
-//     pass: process.env.EMAIL_PASS,
-//   },
-// });
-
-// app.get("/test-mail", async (req, res) => {
-//   try {
-//     const info = await transporter.sendMail({
-//       from: process.env.EMAIL_USER,
-//       to: process.env.EMAIL_USER,
-//       subject: "Test Email",
-//       text: "Mail is working"
-//     });
-
-//     console.log("Mail sent:", info.response);
-
-//     res.send("Mail sent successfully");
-//   } catch (err) {
-//     console.log("Mail error:", err);
-//     res.send("Mail failed");
-//   }
-// });
-
-
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, '0.0.0.0', () => {

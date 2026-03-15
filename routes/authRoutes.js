@@ -3,13 +3,13 @@ const router = express.Router();
 const { body } = require('express-validator');
 const { validate } = require('../middleware/validate');
 const { auth } = require('../middleware/auth');
-const { sendOtp, verifyOtp, updateProfile, getMe } = require('../controllers/authController');
+const { signup, login, googleAuth, updateProfile, getMe } = require('../controllers/authController');
 
 /**
  * @swagger
- * /auth/send-otp:
+ * /auth/signup:
  *   post:
- *     summary: Send OTP to email
+ *     summary: Create a new account
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -17,29 +17,37 @@ const { sendOtp, verifyOtp, updateProfile, getMe } = require('../controllers/aut
  *         application/json:
  *           schema:
  *             type: object
- *             required: [email]
+ *             required: [email, password]
  *             properties:
  *               email:
  *                 type: string
  *                 format: email
+ *               password:
+ *                 type: string
+ *                 minLength: 6
+ *               name:
+ *                 type: string
  *     responses:
- *       200:
- *         description: OTP sent successfully
+ *       201:
+ *         description: Account created
  *       400:
- *         description: Validation error
+ *         description: Email already registered
  */
 router.post(
-  '/send-otp',
-  [body('email').trim().isEmail().withMessage('Valid email is required')],
+  '/signup',
+  [
+    body('email').trim().isEmail().withMessage('Valid email is required'),
+    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  ],
   validate,
-  sendOtp
+  signup
 );
 
 /**
  * @swagger
- * /auth/verify-otp:
+ * /auth/login:
  *   post:
- *     summary: Verify OTP and get JWT token
+ *     summary: Login with email and password
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -47,29 +55,61 @@ router.post(
  *         application/json:
  *           schema:
  *             type: object
- *             required: [email, otp]
+ *             required: [email, password]
  *             properties:
  *               email:
  *                 type: string
  *                 format: email
- *               otp:
+ *               password:
  *                 type: string
  *     responses:
  *       200:
- *         description: OTP verified, returns token and user
- *       400:
- *         description: Invalid or expired OTP
- *       404:
- *         description: User not found
+ *         description: Login successful
+ *       401:
+ *         description: Invalid credentials
  */
 router.post(
-  '/verify-otp',
+  '/login',
   [
     body('email').trim().isEmail().withMessage('Valid email is required'),
-    body('otp').trim().notEmpty().withMessage('OTP is required'),
+    body('password').notEmpty().withMessage('Password is required'),
   ],
   validate,
-  verifyOtp
+  login
+);
+
+/**
+ * @swagger
+ * /auth/google:
+ *   post:
+ *     summary: Authenticate with Google
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, googleId]
+ *             properties:
+ *               email:
+ *                 type: string
+ *               name:
+ *                 type: string
+ *               googleId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Google auth successful
+ */
+router.post(
+  '/google',
+  [
+    body('email').trim().isEmail().withMessage('Valid email is required'),
+    body('googleId').notEmpty().withMessage('Google ID is required'),
+  ],
+  validate,
+  googleAuth
 );
 
 /**
