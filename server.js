@@ -22,6 +22,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/cakes', require('./routes/cakeRoutes'));
 app.use('/api/orders', require('./routes/orderRoutes'));
+app.use('/api/services', require('./routes/serviceRoutes'));
 
 app.get('/', (req, res) => {
   res.json({ message: 'Cake Order Platform API' });
