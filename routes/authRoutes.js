@@ -3,7 +3,7 @@ const router = express.Router();
 const { body } = require('express-validator');
 const { validate } = require('../middleware/validate');
 const { auth } = require('../middleware/auth');
-const { signup, login, googleAuth, updateProfile, getMe } = require('../controllers/authController');
+const { signup, login, googleAuth, updateProfile, getMe, updatePassword } = require('../controllers/authController');
 
 /**
  * @swagger
@@ -158,6 +158,47 @@ router.put(
   [body('name').trim().notEmpty().withMessage('Name is required')],
   validate,
   updateProfile
+);
+
+/**
+ * @swagger
+ * /auth/update-password:
+ *   put:
+ *     summary: Update password using email and old password
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, oldPassword, newPassword]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               oldPassword:
+ *                 type: string
+ *               newPassword:
+ *                 type: string
+ *                 minLength: 6
+ *     responses:
+ *       200:
+ *         description: Password updated successfully
+ *       401:
+ *         description: Old password is incorrect
+ *       404:
+ *         description: No account found
+ */
+router.put(
+  '/update-password',
+  [
+    body('email').trim().isEmail().withMessage('Valid email is required'),
+    body('oldPassword').notEmpty().withMessage('Old password is required'),
+    body('newPassword').isLength({ min: 6 }).withMessage('New password must be at least 6 characters'),
+  ],
+  validate,
+  updatePassword
 );
 
 module.exports = router;

@@ -150,6 +150,35 @@ const updateProfile = async (req, res) => {
   }
 };
 
+// PUT /api/auth/update-password
+const updatePassword = async (req, res) => {
+  try {
+    const { email, oldPassword, newPassword } = req.body;
+
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    if (!user) {
+      return res.status(404).json({ message: 'No account found with this email' });
+    }
+
+    if (!user.password) {
+      return res.status(400).json({ message: 'This account uses Google Sign-In. Password cannot be updated.' });
+    }
+
+    const isMatch = await user.comparePassword(oldPassword);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Old password is incorrect' });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.json({ message: 'Password updated successfully' });
+  } catch (error) {
+    console.error('Update password error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 // GET /api/auth/me
 const getMe = async (req, res) => {
   try {
@@ -164,4 +193,4 @@ const getMe = async (req, res) => {
   }
 };
 
-module.exports = { signup, login, googleAuth, updateProfile, getMe };
+module.exports = { signup, login, googleAuth, updateProfile, getMe, updatePassword };
